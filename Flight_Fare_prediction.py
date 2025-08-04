@@ -1,297 +1,144 @@
 import streamlit as st
-import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+import numpy as np
 import seaborn as sns
+import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_absolute_error,mean_squared_error
-from sklearn.preprocessing import LabelEncoder
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import r2_score
-from sklearn import metrics
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.preprocessing import LabelEncoder, MinMaxScaler, StandardScaler
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.ensemble import RandomForestRegressor
+import warnings
 
+st.set_page_config(layout="wide")
+st.title("🌟 Flight Fare Prediction Web App")
 
+warnings.filterwarnings("ignore")
 
-st.markdown("<h1 style='text-align:center;'>Flight Fare Prediction Machine Learning Project</h1>", unsafe_allow_html=True)
+@st.cache_data
 
-st.image("flight.jpg")
-
-uploaded_file = st.file_uploader("Choose a CSV file", type='csv')
-
-if uploaded_file is not None:
-    # Read the uploaded CSV (not a fixed file)
+def load_data():
     df = pd.read_csv("Clean_Dataset.csv.zip")
-    
-    st.write("Preview of uploaded data:")
-    st.write(df.head())
-    st.html('<br><br>')
-    df=df.drop('Unnamed: 0',axis=1)
-    st.write(df)
-    st.html('<br><br>')
-    st.write(df.tail())
-    st.html("<br><br>")
+    df.drop('Unnamed: 0', axis=1, inplace=True)
+    return df
+
+# Load dataset
+df = load_data()
+st.subheader("📃 Dataset Preview")
+st.dataframe(df.head())
+
+if st.checkbox("Show data summary"):
     st.write(df.describe())
-    st.html("<br><br>")
-    df.isnull().sum()
-
-    st.html("<br><br>")
-
+    st.write("Missing Values:", df.isnull().sum())
     st.write(df.info())
-    st.html('<br><br>')
-    st.write(df.shape)
-    st.html("<br><br>")
-    st.write(df.size)
-    st.html("<br><br>")
+
+# EDA Plots
+st.subheader("📊 Exploratory Data Analysis")
+
+if st.checkbox("Show Scatter Plot: Duration vs Price"):
     fig, ax = plt.subplots()
     sns.scatterplot(x='duration', y='price', data=df, ax=ax)
-    ax.set_title("Scatter Plot: Duration vs Price")
-    ax.set_xlabel("Duration")
-    ax.set_ylabel("Price")
-    st.pyplot(fig)
-    st.html("<br><br>")
-    df1=df.groupby(['flight','airline'],as_index=False).count()
-    st.write(df1.airline.value_counts())
-    st.html("<br><br>")
-    import warnings
-    warnings.filterwarnings('ignore')
-    fig = plt.figure(figsize=(8, 5))
-    sns.countplot(df1['airline'],palette='hls')
-    plt.title('Flights Count of Different Airlines',fontsize=15)
-    plt.xlabel('Count',fontsize=15)
-    plt.ylabel('Airline',fontsize=15)
-    plt.show()
-    st.pyplot(fig)
-    st.html("<br><br>")
-    df2=df.groupby(['airline','flight','class'],as_index=False).count()
-    st.write(df2['class'].value_counts())
-    st.html("<br><br>")
-    fig=plt.figure(figsize=(10,5))
-    df2['class'].value_counts().plot(kind='pie',autopct='%.2f',cmap="cool")
-    plt.title("Classes of Diferent Airlines")
-
-    # Show in Streamlit
-    st.pyplot(fig)
-    st.html("<br><br>")
-
-    fig=plt.figure(figsize=(10,5))
-    st.html("<br><br>")
-    sns.boxplot(x='airline',y='price',data=df,palette='hls')
-    plt.title("Boxplot Airline VS Price")
-    plt.xlabel("Airline")
-    plt.ylabel("Price")
     st.pyplot(fig)
 
-    st.html("<br><br>")
-    fig=plt.figure(figsize=(10,5))
-    sns.boxplot(x='class',y='price',data=df,palette='hls')
-    plt.title("BoxPlot Class VS price")
-    plt.xlabel("Class")
-    plt.ylabel("Price")
+if st.checkbox("Show Count Plot: Flights per Airline"):
+    df1 = df.groupby(['flight', 'airline'], as_index=False).count()
+    fig, ax = plt.subplots(figsize=(8,5))
+    sns.countplot(data=df1, y='airline', palette='hls', ax=ax)
     st.pyplot(fig)
 
-    st.html("<br><br>")
-    fig=plt.figure(figsize=(10,5))
-    sns.boxplot(x='stops',y='price',data=df,palette='hls')
-    plt.title("Boxplot Stop Vs price")
-    plt.xlabel("Stop")
-    plt.ylabel("Price")
+if st.checkbox("Show Pie Chart: Class Distribution"):
+    df2 = df.groupby(['airline', 'flight', 'class'], as_index=False).count()
+    fig, ax = plt.subplots()
+    df2['class'].value_counts().plot.pie(autopct='%.2f', cmap="cool", ax=ax)
     st.pyplot(fig)
 
-    st.html("<br><br>")
-    fig=plt.figure(figsize=(10,5))
-    sns.boxplot(x="departure_time",y='price',data=df,palette='hls')
-    plt.title("Boxplot Departure Time VS Price")
-    plt.xlabel("Departure Time")
-    plt.ylabel("Price")
+# Boxplots
+box_cols = ['airline', 'class', 'stops', 'departure_time', 'arrival_time', 'source_city', 'destination_city']
+st.subheader("🔍 Boxplots")
+for col in box_cols:
+    if st.checkbox(f"Show Boxplot: {col} vs Price"):
+        fig, ax = plt.subplots()
+        sns.boxplot(x=col, y='price', data=df, palette='hls', ax=ax)
+        st.pyplot(fig)
+
+# Lineplots
+st.subheader("📈 Line Plots")
+if st.checkbox("Show Lineplot: Duration vs Price by Class"):
+    fig, ax = plt.subplots(figsize=(20,8))
+    sns.lineplot(data=df, x='duration', y='price', hue='class', palette='hls', ax=ax)
     st.pyplot(fig)
 
-    st.html("<br><br>")
-    sns.boxplot(x="arrival_time",y='price',data=df,palette='hls')
-    plt.title("Boxplot Arrival Time VS Price")
-    plt.xlabel("Arrival Time")
-    plt.ylabel("Price")
+if st.checkbox("Show Lineplot: Days Left vs Price"):
+    fig, ax = plt.subplots(figsize=(20,8))
+    sns.lineplot(data=df, x='days_left', y='price', palette='hls', ax=ax)
     st.pyplot(fig)
 
-    st.html("<br><br>")
-    fig=plt.figure(figsize=(10,5))
-    sns.boxplot(x="source_city",y='price',data=df,palette='hls')
-    plt.title("Boxplot Source City VS Price")
-    plt.xlabel("Source City")
-    plt.ylabel("Price")
+if st.checkbox("Show Lineplot: Days Left vs Price by Airline"):
+    fig, ax = plt.subplots(figsize=(20,8))
+    sns.lineplot(data=df, x='days_left', y='price', hue='airline', palette='hls', ax=ax)
     st.pyplot(fig)
 
-    st.html("<br><br>")
-    fig=plt.figure(figsize=(10,5))
-    sns.boxplot(x="destination_city",y='price',data=df,palette='hls')
-    plt.title("Boxplot Destination City  VS Price")
-    plt.xlabel("Destination City")
-    plt.ylabel("Price")
+# Encoding and Splitting
+df_encoded = df.copy()
+le = LabelEncoder()
+for col in df_encoded.columns:
+    if df_encoded[col].dtype == 'object':
+        df_encoded[col] = le.fit_transform(df_encoded[col])
+
+x = df_encoded.drop('price', axis=1)
+y = df_encoded['price']
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.3, random_state=42)
+
+# Scaling
+scaler1 = MinMaxScaler()
+x_train = scaler1.fit_transform(x_train)
+x_test = scaler1.transform(x_test)
+
+scaler2 = StandardScaler()
+x_train = scaler2.fit_transform(x_train)
+x_test = scaler2.transform(x_test)
+
+# Model Training
+st.subheader("🚀 Model Training & Evaluation")
+model_option = st.selectbox("Choose Regression Model", ("Linear Regression", "Decision Tree", "Random Forest"))
+
+if st.button("Train Model"):
+    if model_option == "Linear Regression":
+        model = LinearRegression()
+    elif model_option == "Decision Tree":
+        model = DecisionTreeRegressor()
+    else:
+        model = RandomForestRegressor()
+
+    model.fit(x_train, y_train)
+    y_pred = model.predict(x_test)
+
+    st.success(f"{model_option} trained successfully!")
+    st.write("Mean Absolute Error:", mean_absolute_error(y_test, y_pred))
+    st.write("Mean Squared Error:", mean_squared_error(y_test, y_pred))
+    st.write("Root Mean Squared Error:", np.sqrt(mean_squared_error(y_test, y_pred)))
+    r2 = r2_score(y_test, y_pred)
+    st.write("R² Score:", r2)
+    adj_r2 = 1 - (1 - r2) * (len(y) - 1) / (len(y) - x.shape[1] - 1)
+    st.write("Adjusted R² Score:", round(adj_r2, 6))
+
+    # Heatmap
+    st.subheader("🌡 Heatmap of Correlation")
+    fig, ax = plt.subplots(figsize=(16,5))
+    sns.heatmap(df_encoded.corr(), annot=True, fmt='.2f', cmap='viridis', ax=ax)
     st.pyplot(fig)
 
-    st.html("<br><br>")
-    plt.style.use('dark_background')
-    fig=plt.figure(figsize=(20,8))
-    sns.lineplot(data=df,x='duration',y='price',hue='class',palette='hls')
-    plt.title('Ticket Price Versus Flight Duration Based on Class')
-    plt.xlabel('Duration')
-    plt.ylabel('Price')
-    plt.show()
-    st.pyplot(fig)
+    # Actual vs Predicted
+    st.subheader("📊 Actual vs Predicted")
+    fig1, ax1 = plt.subplots()
+    sns.scatterplot(x=y_test, y=y_pred, ax=ax1)
+    ax1.set_xlabel("Actual")
+    ax1.set_ylabel("Predicted")
+    st.pyplot(fig1)
 
-    st.html("<br><br>")
-    plt.figure(figsize=(20,8))
-    sns.lineplot(data=df,x='days_left',y='price',palette='hls')
-    plt.title('Days Left for Departure Ticket Price',fontsize=20)
-    plt.xlabel('Duration',fontsize=15)
-    plt.ylabel('Price',fontsize=15)
-    plt.show()
-    st.pyplot(fig)
-
-    st.html("<br><br>")
-    fig=plt.figure(figsize=(20,8))
-    sns.lineplot(data=df,x='days_left',y='price',palette='hls',hue='airline')
-    plt.title('Days Left for Departure Ticket Price',fontsize=20)
-    plt.xlabel('Duration',fontsize=15)
-    plt.ylabel('Price',fontsize=15)
-    plt.show()
-    st.pyplot(fig)
-
-    st.html("<br><br>")
-    st.write(df.groupby(['airline','class','source_city','destination_city','flight'],as_index=False).count().groupby(['source_city','destination_city'],as_index=False)['flight'].count().head(10))
-    
-    st.html("<br><br>")
-    st.write(df.groupby(['airline','source_city','destination_city'],as_index=False)['price'].mean().head(10))
-
-    le=LabelEncoder()
-    for col in df.columns:
-        if df[col].dtype=='object':
-            df[col]=le.fit_transform(df[col])
-            
-    
-    st.html("<br><br>")
-    #set features and target
-    x=df.drop('price',axis=1)
-    y=df['price']
-
-    x_train,x_test,y_train,y_test=train_test_split(x,y,test_size=0.30,random_state=42)
-
-    x_train.shape,x_test.shape,y_train.shape,y_test.shape
-
-    st.html("<br><br>")
-    mmscaler=MinMaxScaler(feature_range=(0,1))
-    x_train=mmscaler.fit_transform(x_train)
-    x_test=mmscaler.fit_transform(x_test)
-    x_train=pd.DataFrame(x_train)
-    x_test=pd.DataFrame(x_test)  
-
-    st.html("<br><br>")
-    scaler=StandardScaler()
-    x_train=scaler.fit_transform(x_train)
-    x_test=scaler.transform(x_test)
-
-    st.write(x_train)
-    st.html("<br><br>")
-    st.write(x_test)
-
-    lr=LinearRegression()
-    st.write(lr.fit(x_train,y_train))
-
-    st.html("<br><br>")
-    st.write("Coefficient or slope: ", lr.coef_)
-    st.html("<br><br>")
-    st.write("Intercept: ", lr.intercept_)
-
-    st.html("<br><br>")
-    y_pred=lr.predict(x_test)
-    y_pred
-
-    st.html("<br><br>")
-    rmse=np.sqrt(mean_squared_error(y_test,y_pred))
-    st.write("Mean Absolute Error:",mean_absolute_error(y_test,y_pred))
-    st.write("Mean Squared Error:",mean_squared_error(y_test,y_pred))
-    st.write("Root Mean squared Error:",rmse)
-
-    st.html("<br><br>")
-    st.write("Accuray R2 score",r2_score(y_test,y_pred))
-
-    st.html("<br><br>")
-    r_squared = round(metrics.r2_score(y_test, y_pred),6)
-    adjusted_r_squared = round(1 - (1-r_squared)*(len(y)-1)/(len(y)-x.shape[1]-1),6)
-    st.write('Adj R Square: ', adjusted_r_squared)
-
-    st.html("<br><br>")
-    dtr=DecisionTreeRegressor()
-    st.write(dtr.fit(x_train,y_train))
-    
-    st.html("<br><br>")
-    y_pred=dtr.predict(x_test)
-    y_pred
-
-    st.html("<br><br>")
-    rmse=np.sqrt(mean_squared_error(y_test,y_pred))
-    st.write("Mean Absolute Error:",mean_absolute_error(y_test,y_pred))
-    st.write("Mean Squared Error:",mean_squared_error(y_test,y_pred))
-    st.write("Root Mean squared Error:",rmse)
-
-    st.html("<br><br>")
-    st.write("Accuray R2 score",r2_score(y_test,y_pred))
-
-    st.html("<br><br>")
-    r_squared = round(metrics.r2_score(y_test, y_pred),6)
-    adjusted_r_squared = round(1 - (1-r_squared)*(len(y)-1)/(len(y)-x.shape[1]-1),6)
-    st.write('Adj R Square: ', adjusted_r_squared)
-
-
-    st.html("<br><br>")
-    rfg=RandomForestRegressor()
-    st.write(rfg.fit(x_train,y_train))
-
-    st.html("<br><br>")
-    y_pred=rfg.predict(x_test)
-    y_pred
-
-    st.html("<br><br>")
-    rmse=np.sqrt(mean_squared_error(y_test,y_pred))
-    st.write("Mean Absolute Error:",mean_absolute_error(y_test,y_pred))
-    st.write("Mean Squared Error:",mean_squared_error(y_test,y_pred))
-    st.write("Root Mean squared Error:",rmse)
-
-    st.html("<br><br>")
-    st.write("Accuray R2 score",r2_score(y_test,y_pred))
-
-    st.html("<br><br>")
-    r_squared = round(metrics.r2_score(y_test, y_pred),6)
-    adjusted_r_squared = round(1 - (1-r_squared)*(len(y)-1)/(len(y)-x.shape[1]-1),6)
-    st.write('Adj R Square: ', adjusted_r_squared)
-
-    st.html("<br><br>")
-    corr=df.corr()
-
-    st.html("<br><br>")
-    fig=plt.figure(figsize=(16,5))
-    sns.heatmap(corr,annot=True,fmt='.2f',cmap='viridis')
-    st.pyplot(fig)
-
-    st.html("<br><br>")
-    fig=plt.figure(figsize=(10,5))
-    sns.scatterplot(x=y_test, y=y_pred)
-    plt.xlabel("Actual Values")
-    plt.ylabel("Predicted Values")
-    plt.title("Actual vs Predicted")
-    plt.show()
-    st.pyplot(fig)
-
-    st.html("<br><br>")
-    fig=plt.figure(figsize=(10,5))
-    sns.lineplot(x=range(len(y_test)), y=y_test, label='Actual')
-    sns.lineplot(x=range(len(y_pred)), y=y_pred, label='Predicted')
-    plt.xlabel("Index")
-    plt.ylabel("Values")
-    plt.title("Actual vs Predicted Over Time")
-    plt.legend()
-    plt.show()
-    st.pyplot(fig)
+    fig2, ax2 = plt.subplots()
+    sns.lineplot(x=range(len(y_test)), y=y_test, label='Actual', ax=ax2)
+    sns.lineplot(x=range(len(y_pred)), y=y_pred, label='Predicted', ax=ax2)
+    ax2.set_title("Actual vs Predicted Over Index")
+    st.pyplot(fig2)
