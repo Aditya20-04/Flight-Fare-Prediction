@@ -11,6 +11,8 @@ from sklearn.tree import DecisionTreeRegressor
 from sklearn.ensemble import RandomForestRegressor
 import warnings
 
+st.code('<meta name="google-site-verification" content="your-code" />', language='html')
+
 st.set_page_config(layout="wide")
 st.title("🌟 Flight Fare Prediction Web App")
 
@@ -142,3 +144,4 @@ if st.button("Train Model"):
     sns.lineplot(x=range(len(y_pred)), y=y_pred, label='Predicted', ax=ax2)
     ax2.set_title("Actual vs Predicted Over Index")
     st.pyplot(fig2)
+
