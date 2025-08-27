@@ -1,148 +1,262 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import seaborn as sns
-import matplotlib.pyplot as plt
+import zipfile
+import datetime
 from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-from sklearn.preprocessing import LabelEncoder, MinMaxScaler, StandardScaler
-from sklearn.tree import DecisionTreeRegressor
+from sklearn.preprocessing import LabelEncoder
 from sklearn.ensemble import RandomForestRegressor
-import warnings
+from sklearn.linear_model import LinearRegression
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.metrics import r2_score, mean_squared_error
+
+# Set page config with a wide layout and a custom title
+st.set_page_config(page_title="Flight Fare Predictor", layout="wide")
+
+# --- Custom CSS for the new design ---
+st.markdown("""
+<style>
+    /* Main body and app container styling */
+    .stApp {
+        background: linear-gradient(135deg, #0a0e14, #141a23);
+        color: #d1e2f4;
+        font-family: 'Inter', sans-serif;
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+        color: #f77f00;
+    }
+
+    /* Style the main app title */
+    .st-emotion-cache-18ni7ap {
+        text-align: center;
+        margin-top: -20px;
+        background: -webkit-linear-gradient(45deg, #f77f00, #fcbf49);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-size: 3em;
+        font-weight: bold;
+        padding-top: 20px;
+    }
+
+    /* Card styling for the input form */
+    .st-emotion-cache-163v45g {
+        background-color: #0d121c;
+        padding: 30px;
+        border-radius: 15px;
+        border: 1px solid #2e3b4a;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+    }
+    
+    /* Style for the sidebar radio buttons */
+    .st-emotion-cache-1m6csg5 {
+        color: #d1e2f4;
+    }
+
+    /* Style for the sidebar headers */
+    .st-emotion-cache-1090x21 {
+        color: #f77f00;
+    }
+
+    /* Styling for the new ticket display */
+    .ticket-card {
+        background-color: #0d121c;
+        padding: 40px;
+        border-radius: 20px;
+        border: 1px solid #2e3b4a;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+    
+    .ticket-card h3 {
+        color: #d1e2f4;
+        margin-bottom: 20px;
+        border-bottom: 2px dashed #2e3b4a;
+        padding-bottom: 10px;
+        width: 100%;
+    }
+    
+    .ticket-details {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-around;
+        width: 100%;
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+    
+    .detail-item {
+        background-color: #1a232f;
+        padding: 15px;
+        border-radius: 10px;
+        flex-grow: 1;
+        min-width: 200px;
+        text-align: left;
+    }
+    
+    .detail-item b {
+        color: #f77f00;
+    }
+    
+    .price-display {
+        background: linear-gradient(45deg, #fcbf49, #f77f00);
+        padding: 20px 40px;
+        border-radius: 15px;
+        color: #0d121c;
+        font-size: 2.5em;
+        font-weight: bold;
+        box-shadow: 0 6px 15px rgba(247, 127, 0, 0.4);
+        margin-top: 20px;
+        animation: pulse 1.5s infinite;
+    }
+    
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
+    }
+</style>
+""", unsafe_allow_html=True)
 
 
+st.title("✈️ Flight Fare Prediction App")
 
-st.set_page_config(layout="wide")
-st.title("🌟 Flight Fare Prediction Web App")
-
-warnings.filterwarnings("ignore")
-
+# ---------------- Load dataset ---------------- #
 @st.cache_data
-
 def load_data():
-    df = pd.read_csv("Clean_Dataset.csv.zip")
-    df.drop('Unnamed: 0', axis=1, inplace=True)
+    """Loads the dataset from a zip file and caches it."""
+    with zipfile.ZipFile("Clean_Dataset.csv.zip", 'r') as z:
+        csv_name = z.namelist()[0]
+        df = pd.read_csv(z.open(csv_name))
     return df
 
-# Load dataset
 df = load_data()
-st.subheader("📃 Dataset Preview")
-st.dataframe(df.head())
+df = df.dropna()
 
-if st.checkbox("Show data summary"):
-    st.write(df.describe())
-    st.write("Missing Values:", df.isnull().sum())
-    st.write(df.info())
+# ---------------- Encode Categorical ---------------- #
+label_encoders = {}
+for col in df.select_dtypes(include="object").columns:
+    le = LabelEncoder()
+    df[col] = le.fit_transform(df[col])
+    label_encoders[col] = le
 
-# EDA Plots
-st.subheader("📊 Exploratory Data Analysis")
+# ---------------- Features & Target ---------------- #
+X = df.drop("price", axis=1)
+y = df["price"]
 
-if st.checkbox("Show Scatter Plot: Duration vs Price"):
-    fig, ax = plt.subplots()
-    sns.scatterplot(x='duration', y='price', data=df, ax=ax)
-    st.pyplot(fig)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-if st.checkbox("Show Count Plot: Flights per Airline"):
-    df1 = df.groupby(['flight', 'airline'], as_index=False).count()
-    fig, ax = plt.subplots(figsize=(8,5))
-    sns.countplot(data=df1, y='airline', palette='hls', ax=ax)
-    st.pyplot(fig)
+# ---------------- Model Selection ---------------- #
+st.sidebar.header("⚙️ Choose Model")
+model_choice = st.sidebar.radio("Select Model", ["Random Forest", "Decision Tree", "Linear Regression"])
 
-if st.checkbox("Show Pie Chart: Class Distribution"):
-    df2 = df.groupby(['airline', 'flight', 'class'], as_index=False).count()
-    fig, ax = plt.subplots()
-    df2['class'].value_counts().plot.pie(autopct='%.2f', cmap="cool", ax=ax)
-    st.pyplot(fig)
+# Initialize and fit the chosen model
+if model_choice == "Linear Regression":
+    model = LinearRegression()
+elif model_choice == "Decision Tree":
+    model = DecisionTreeRegressor(random_state=42)
+else:
+    model = RandomForestRegressor(random_state=42)
 
-# Boxplots
-box_cols = ['airline', 'class', 'stops', 'departure_time', 'arrival_time', 'source_city', 'destination_city']
-st.subheader("🔍 Boxplots")
-for col in box_cols:
-    if st.checkbox(f"Show Boxplot: {col} vs Price"):
-        fig, ax = plt.subplots()
-        sns.boxplot(x=col, y='price', data=df, palette='hls', ax=ax)
-        st.pyplot(fig)
+model.fit(X_train, y_train)
+y_pred = model.predict(X_test)
 
-# Lineplots
-st.subheader("📈 Line Plots")
-if st.checkbox("Show Lineplot: Duration vs Price by Class"):
-    fig, ax = plt.subplots(figsize=(20,8))
-    sns.lineplot(data=df, x='duration', y='price', hue='class', palette='hls', ax=ax)
-    st.pyplot(fig)
+# ---------------- Model Performance ---------------- #
+st.sidebar.subheader("📊 Model Performance")
+st.sidebar.metric("R² Score", f"{r2_score(y_test, y_pred):.3f}")
+st.sidebar.metric("RMSE", f"₹ {np.sqrt(mean_squared_error(y_test, y_pred)):.2f}")
 
-if st.checkbox("Show Lineplot: Days Left vs Price"):
-    fig, ax = plt.subplots(figsize=(20,8))
-    sns.lineplot(data=df, x='days_left', y='price', palette='hls', ax=ax)
-    st.pyplot(fig)
+# ---------------- Passenger Input Form ---------------- #
+st.subheader("🧑‍✈️ Enter Passenger Flight Details")
 
-if st.checkbox("Show Lineplot: Days Left vs Price by Airline"):
-    fig, ax = plt.subplots(figsize=(20,8))
-    sns.lineplot(data=df, x='days_left', y='price', hue='airline', palette='hls', ax=ax)
-    st.pyplot(fig)
+with st.form("passenger_form"):
+    # Split layout into two columns for a cleaner look
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Airline
+        airline = st.selectbox("Airline", label_encoders["airline"].classes_)
+        airline_enc = label_encoders["airline"].transform([airline])[0]
+    
+        # Source City
+        source = st.selectbox("Source City", label_encoders["source_city"].classes_)
+        source_enc = label_encoders["source_city"].transform([source])[0]
+    
+        # Departure Time
+        dep_cat = st.selectbox("Departure Time", label_encoders["departure_time"].classes_)
+        dep_enc = label_encoders["departure_time"].transform([dep_cat])[0]
+    
+        # Total Stops
+        total_stops = st.selectbox("Total Stops", sorted(df["stops"].unique()))
+    
+    with col2:
+        # Date of Journey
+        journey_date = st.date_input("Date of Journey", datetime.date.today())
+        
+        # Destination City
+        destination = st.selectbox("Destination City", label_encoders["destination_city"].classes_)
+        destination_enc = label_encoders["destination_city"].transform([destination])[0]
+    
+        # Arrival Time
+        arr_cat = st.selectbox("Arrival Time", label_encoders["arrival_time"].classes_)
+        arr_enc = label_encoders["arrival_time"].transform([arr_cat])[0]
+    
+        # Duration (hours input)
+        duration = st.number_input("Duration (in hours)", min_value=1.0, max_value=30.0, step=0.5)
 
-# Encoding and Splitting
-df_encoded = df.copy()
-le = LabelEncoder()
-for col in df_encoded.columns:
-    if df_encoded[col].dtype == 'object':
-        df_encoded[col] = le.fit_transform(df_encoded[col])
+    # Travel class
+    travel_class = st.radio("Travel Class", label_encoders["class"].classes_)
+    class_enc = label_encoders["class"].transform([travel_class])[0]
 
-x = df_encoded.drop('price', axis=1)
-y = df_encoded['price']
-x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.3, random_state=42)
+    submitted = st.form_submit_button("🔮 Predict Fare")
 
-# Scaling
-scaler1 = MinMaxScaler()
-x_train = scaler1.fit_transform(x_train)
-x_test = scaler1.transform(x_test)
+# ---------------- Make Prediction ---------------- #
+if submitted:
+    today = datetime.date.today()
+    days_left = (journey_date - today).days
 
-scaler2 = StandardScaler()
-x_train = scaler2.fit_transform(x_train)
-x_test = scaler2.transform(x_test)
+    # Build input dict with SAME COLUMNS as training
+    input_data = {
+        "Unnamed: 0": 0,
+        "airline": airline_enc,
+        "flight": 0,  # dummy
+        "source_city": source_enc,
+        "destination_city": destination_enc,
+        "class": class_enc,
+        "departure_time": dep_enc,
+        "arrival_time": arr_enc,
+        "stops": total_stops,
+        "duration": duration,
+        "days_left": days_left
+    }
 
-# Model Training
-st.subheader("🚀 Model Training & Evaluation")
-model_option = st.selectbox("Choose Regression Model", ("Linear Regression", "Decision Tree", "Random Forest"))
+    input_df = pd.DataFrame([input_data])
+    input_df = input_df[X.columns]
 
-if st.button("Train Model"):
-    if model_option == "Linear Regression":
-        model = LinearRegression()
-    elif model_option == "Decision Tree":
-        model = DecisionTreeRegressor()
-    else:
-        model = RandomForestRegressor()
+    prediction = model.predict(input_df)[0]
 
-    model.fit(x_train, y_train)
-    y_pred = model.predict(x_test)
-
-    st.success(f"{model_option} trained successfully!")
-    st.write("Mean Absolute Error:", mean_absolute_error(y_test, y_pred))
-    st.write("Mean Squared Error:", mean_squared_error(y_test, y_pred))
-    st.write("Root Mean Squared Error:", np.sqrt(mean_squared_error(y_test, y_pred)))
-    r2 = r2_score(y_test, y_pred)
-    st.write("R² Score:", r2)
-    adj_r2 = 1 - (1 - r2) * (len(y) - 1) / (len(y) - x.shape[1] - 1)
-    st.write("Adjusted R² Score:", round(adj_r2, 6))
-
-    # Heatmap
-    st.subheader("🌡 Heatmap of Correlation")
-    fig, ax = plt.subplots(figsize=(16,5))
-    sns.heatmap(df_encoded.corr(), annot=True, fmt='.2f', cmap='viridis', ax=ax)
-    st.pyplot(fig)
-
-    # Actual vs Predicted
-    st.subheader("📊 Actual vs Predicted")
-    fig1, ax1 = plt.subplots()
-    sns.scatterplot(x=y_test, y=y_pred, ax=ax1)
-    ax1.set_xlabel("Actual")
-    ax1.set_ylabel("Predicted")
-    st.pyplot(fig1)
-
-    fig2, ax2 = plt.subplots()
-    sns.lineplot(x=range(len(y_test)), y=y_test, label='Actual', ax=ax2)
-    sns.lineplot(x=range(len(y_pred)), y=y_pred, label='Predicted', ax=ax2)
-    ax2.set_title("Actual vs Predicted Over Index")
-    st.pyplot(fig2)
-
-
+    # ---------------- Stylish Ticket Display (New Design) ---------------- #
+    st.subheader("🎟️ Predicted Flight Fare")
+    st.markdown(
+        f"""
+        <div class="ticket-card">
+            <div class="ticket-details">
+                <div class="detail-item"><b>Airline:</b> {airline}</div>
+                <div class="detail-item"><b>Source:</b> {source}</div>
+                <div class="detail-item"><b>Destination:</b> {destination}</div>
+                <div class="detail-item"><b>Date:</b> {journey_date.strftime('%d %b %Y')}</div>
+                <div class="detail-item"><b>Departure:</b> {dep_cat}</div>
+                <div class="detail-item"><b>Arrival:</b> {arr_cat}</div>
+                <div class="detail-item"><b>Class:</b> {travel_class}</div>
+                <div class="detail-item"><b>Stops:</b> {total_stops}</div>
+            </div>
+            <div class="price-display">
+                ₹ {round(prediction, 2)}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
